@@ -2,14 +2,15 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VPS Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f0f23;
-            color: #e0e0e0;
+            background: var(--tg-theme-bg-color, #0f0f23);
+            color: var(--tg-theme-text-color, #e0e0e0);
             min-height: 100vh;
             padding: 16px;
         }
@@ -22,6 +23,7 @@
         }
         .header h1 { font-size: 24px; color: #00d4ff; margin-bottom: 4px; }
         .header .subtitle { color: #666; font-size: 12px; }
+        .header .user-info { color: #00d4ff; font-size: 13px; margin-top: 6px; }
         .card {
             background: #1a1a2e;
             border-radius: 12px;
@@ -51,33 +53,23 @@
         .stat-value.warn { color: #ffaa00; }
         .stat-value.bad { color: #ff4444; }
         .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #252540;
-            border-radius: 4px;
-            margin-top: 6px;
-            overflow: hidden;
+            width: 100%; height: 8px;
+            background: #252540; border-radius: 4px;
+            margin-top: 6px; overflow: hidden;
         }
         .progress-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.5s;
+            height: 100%; border-radius: 4px; transition: width 0.5s;
         }
         .progress-fill.green { background: linear-gradient(90deg, #00ff88, #00cc6a); }
         .progress-fill.yellow { background: linear-gradient(90deg, #ffaa00, #ff8800); }
         .progress-fill.red { background: linear-gradient(90deg, #ff4444, #cc0000); }
         .process-item {
-            display: flex;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #252540;
+            display: flex; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid #252540;
         }
         .process-item:last-child { border-bottom: none; }
         .process-status {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 10px;
+            width: 8px; height: 8px; border-radius: 50%; margin-right: 10px;
         }
         .process-status.online { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
         .process-status.offline { background: #ff4444; box-shadow: 0 0 6px #ff4444; }
@@ -86,30 +78,21 @@
         .process-meta { color: #666; font-size: 11px; margin-top: 2px; }
         .process-mem { color: #00d4ff; font-size: 13px; font-weight: 600; }
         .refresh-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #00d4ff, #0088cc);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 8px;
+            width: 100%; padding: 14px;
+            background: var(--tg-theme-button-color, linear-gradient(135deg, #00d4ff, #0088cc));
+            color: var(--tg-theme-button-text-color, white);
+            border: none; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px;
         }
         .refresh-btn:active { transform: scale(0.98); }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-        .last-update {
-            text-align: center;
-            color: #444;
-            font-size: 11px;
-            margin-top: 16px;
-        }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .last-update { text-align: center; color: #444; font-size: 11px; margin-top: 16px; }
         .error { color: #ff4444; text-align: center; padding: 20px; }
+        .auth-error {
+            text-align: center; padding: 60px 20px;
+        }
+        .auth-error h2 { color: #ff4444; margin-bottom: 12px; }
+        .auth-error p { color: #888; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -117,6 +100,7 @@
         <div class="header">
             <h1>🖥️ VPS Monitor</h1>
             <div class="subtitle">Real-time server status</div>
+            <div class="user-info" id="userInfo"></div>
         </div>
 
         <div id="content">
@@ -128,27 +112,60 @@
     </div>
 
     <script>
-        // Initialize Telegram Mini App if available
-        if (window.Telegram && window.Telegram.WebApp) {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
+        // Initialize Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        let initData = '';
+
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            initData = tg.initData || '';
+
+            // Show user info
+            if (tg.initDataUnsafe?.user) {
+                const u = tg.initDataUnsafe.user;
+                document.getElementById('userInfo').textContent =
+                    `👤 ${u.first_name || ''} ${u.last_name || ''} (@${u.username || 'N/A'})`;
+            }
         }
 
         async function loadData() {
             const content = document.getElementById('content');
+
+            if (!initData) {
+                content.innerHTML = `
+                    <div class="auth-error">
+                        <h2>🔒 Access Denied</h2>
+                        <p>Buka dashboard ini dari Telegram Mini App.</p>
+                    </div>`;
+                return;
+            }
+
             content.innerHTML = '<div class="loading">⏳ Fetching data...</div>';
 
             try {
-                const response = await fetch('/api/status');
+                const response = await fetch('/api/status', {
+                    headers: { 'X-Telegram-Init-Data': initData }
+                });
+
+                if (response.status === 401) {
+                    content.innerHTML = `
+                        <div class="auth-error">
+                            <h2>🔒 Unauthorized</h2>
+                            <p>Auth gagal. Buka ulang dari Telegram.</p>
+                        </div>`;
+                    return;
+                }
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     content.innerHTML = `<div class="error">❌ ${data.error}</div>`;
                     return;
                 }
-                
+
                 renderDashboard(data);
-                document.getElementById('lastUpdate').textContent = 
+                document.getElementById('lastUpdate').textContent =
                     'Last update: ' + new Date().toLocaleTimeString('id-ID');
             } catch (error) {
                 content.innerHTML = '<div class="error">❌ Failed to load data</div>';
@@ -210,8 +227,7 @@
                                 <div class="process-meta">PID: ${proc.pid} • Uptime: ${proc.uptime}</div>
                             </div>
                             <div class="process-mem">${proc.memory}MB</div>
-                        </div>
-                    `;
+                        </div>`;
                 });
             } else {
                 html += '<div style="color: #666; text-align: center; padding: 12px;">No processes running</div>';
@@ -236,10 +252,9 @@
             document.getElementById('content').innerHTML = html;
         }
 
-        // Auto-load on page open
+        // Auto-load
         loadData();
-        
-        // Auto-refresh every 30 seconds
+        // Auto-refresh every 30s
         setInterval(loadData, 30000);
     </script>
 </body>
