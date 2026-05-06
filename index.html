@@ -148,16 +148,18 @@
                     headers: { 'X-Telegram-Init-Data': initData }
                 });
 
+                const data = await response.json();
+
                 if (response.status === 401) {
                     content.innerHTML = `
                         <div class="auth-error">
                             <h2>🔒 Unauthorized</h2>
-                            <p>Auth gagal. Buka ulang dari Telegram.</p>
+                            <p>${data.error || 'Auth gagal'}</p>
+                            <pre style="color:#666;font-size:10px;margin-top:12px;word-break:break-all;">${JSON.stringify(data.debug || {}, null, 2)}</pre>
+                            <pre style="color:#444;font-size:9px;margin-top:8px;word-break:break-all;">initData: ${initData.substring(0, 200)}...</pre>
                         </div>`;
                     return;
                 }
-
-                const data = await response.json();
 
                 if (data.error) {
                     content.innerHTML = `<div class="error">❌ ${data.error}</div>`;
