@@ -2,6 +2,27 @@
 
 A real-time VPS monitoring dashboard built as a [Telegram Mini App](https://core.telegram.org/bots/webapps). Displays system resources, PM2 processes, and network stats with Telegram auto-login authentication.
 
+## Overview
+
+A real-time VPS monitoring dashboard accessible directly from Telegram as a Mini App. No need to open a browser or SSH — just tap a button in the bot and instantly see your server status.
+
+### Use Cases
+- 📊 Monitor CPU, RAM, and Disk usage in real-time
+- 🤖 Check PM2 process status (nara-dca-agent, portal-bot, etc.)
+- 🌐 View public IP and active network connections
+- 🔄 Auto-refreshes every 30 seconds
+- 🔒 Secure — only accessible via Telegram, not exposed to the public web
+
+### Who needs this?
+- VPS owners who want quick server status from their phone without SSH
+- Monitoring trading bot servers (DCA, arbitrage, etc.)
+- Quick health check to see if your server is alive or down
+
+### Access
+Open @smartportalaibot → tap 📊 VPS or 🖥️ Dashboard
+
+Simple, fast, secure. 🚀
+
 ## Features
 
 - 📊 **Real-time CPU, RAM, Disk monitoring** — progress bars with color-coded thresholds
