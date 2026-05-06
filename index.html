@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPS Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f23;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 16px;
+        }
+        .container { max-width: 400px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #1a1a3a;
+            margin-bottom: 20px;
+        }
+        .header h1 { font-size: 24px; color: #00d4ff; margin-bottom: 4px; }
+        .header .subtitle { color: #666; font-size: 12px; }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #252540;
+        }
+        .card-title {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #252540;
+        }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: #aaa; font-size: 13px; }
+        .stat-value { font-weight: 600; font-size: 14px; }
+        .stat-value.good { color: #00ff88; }
+        .stat-value.warn { color: #ffaa00; }
+        .stat-value.bad { color: #ff4444; }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #252540;
+            border-radius: 4px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+        .progress-fill.green { background: linear-gradient(90deg, #00ff88, #00cc6a); }
+        .progress-fill.yellow { background: linear-gradient(90deg, #ffaa00, #ff8800); }
+        .progress-fill.red { background: linear-gradient(90deg, #ff4444, #cc0000); }
+        .process-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #252540;
+        }
+        .process-item:last-child { border-bottom: none; }
+        .process-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .process-status.online { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+        .process-status.offline { background: #ff4444; box-shadow: 0 0 6px #ff4444; }
+        .process-info { flex: 1; }
+        .process-name { font-weight: 600; font-size: 14px; }
+        .process-meta { color: #666; font-size: 11px; margin-top: 2px; }
+        .process-mem { color: #00d4ff; font-size: 13px; font-weight: 600; }
+        .refresh-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #00d4ff, #0088cc);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .refresh-btn:active { transform: scale(0.98); }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .last-update {
+            text-align: center;
+            color: #444;
+            font-size: 11px;
+            margin-top: 16px;
+        }
+        .error { color: #ff4444; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ VPS Monitor</h1>
+            <div class="subtitle">Real-time server status</div>
+        </div>
+
+        <div id="content">
+            <div class="loading">⏳ Loading...</div>
+        </div>
+
+        <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+        <div class="last-update" id="lastUpdate"></div>
+    </div>
+
+    <script>
+        // Initialize Telegram Mini App if available
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+
+        async function loadData() {
+            const content = document.getElementById('content');
+            content.innerHTML = '<div class="loading">⏳ Fetching data...</div>';
+
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                if (data.error) {
+                    content.innerHTML = `<div class="error">❌ ${data.error}</div>`;
+                    return;
+                }
+                
+                renderDashboard(data);
+                document.getElementById('lastUpdate').textContent = 
+                    'Last update: ' + new Date().toLocaleTimeString('id-ID');
+            } catch (error) {
+                content.innerHTML = '<div class="error">❌ Failed to load data</div>';
+            }
+        }
+
+        function renderDashboard(data) {
+            const cpuPercent = parseFloat(data.cpu) || 0;
+            const ramMatch = data.ram.match(/(\d+)Mi\/(\d+)Gi/);
+            const ramUsed = ramMatch ? parseInt(ramMatch[1]) : 0;
+            const ramTotal = ramMatch ? parseInt(ramMatch[2]) * 1024 : 1;
+            const ramPercent = Math.round((ramUsed / ramTotal) * 100);
+            const diskMatch = data.disk.match(/(\d+)%/);
+            const diskPercent = diskMatch ? parseInt(diskMatch[1]) : 0;
+
+            let html = '';
+
+            // System Resources
+            html += `
+                <div class="card">
+                    <div class="card-title"><span>📊</span> System Resources</div>
+                    <div class="stat-row">
+                        <span class="stat-label">CPU</span>
+                        <span class="stat-value ${cpuPercent > 80 ? 'bad' : cpuPercent > 50 ? 'warn' : 'good'}">${cpuPercent}%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${cpuPercent > 80 ? 'red' : cpuPercent > 50 ? 'yellow' : 'green'}" style="width: ${cpuPercent}%"></div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">RAM</span>
+                        <span class="stat-value ${ramPercent > 80 ? 'bad' : ramPercent > 50 ? 'warn' : 'good'}">${data.ram}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${ramPercent > 80 ? 'red' : ramPercent > 50 ? 'yellow' : 'green'}" style="width: ${ramPercent}%"></div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Disk</span>
+                        <span class="stat-value ${diskPercent > 80 ? 'bad' : diskPercent > 50 ? 'warn' : 'good'}">${data.disk}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${diskPercent > 80 ? 'red' : diskPercent > 50 ? 'yellow' : 'green'}" style="width: ${diskPercent}%"></div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Uptime</span>
+                        <span class="stat-value">${data.uptime}</span>
+                    </div>
+                </div>
+            `;
+
+            // PM2 Processes
+            html += '<div class="card"><div class="card-title"><span>🤖</span> PM2 Processes</div>';
+            if (data.processes && data.processes.length > 0) {
+                data.processes.forEach(proc => {
+                    html += `
+                        <div class="process-item">
+                            <div class="process-status ${proc.status === 'online' ? 'online' : 'offline'}"></div>
+                            <div class="process-info">
+                                <div class="process-name">${proc.name}</div>
+                                <div class="process-meta">PID: ${proc.pid} • Uptime: ${proc.uptime}</div>
+                            </div>
+                            <div class="process-mem">${proc.memory}MB</div>
+                        </div>
+                    `;
+                });
+            } else {
+                html += '<div style="color: #666; text-align: center; padding: 12px;">No processes running</div>';
+            }
+            html += '</div>';
+
+            // Network
+            html += `
+                <div class="card">
+                    <div class="card-title"><span>🌐</span> Network</div>
+                    <div class="stat-row">
+                        <span class="stat-label">Public IP</span>
+                        <span class="stat-value">${data.ip}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Connections</span>
+                        <span class="stat-value">${data.connections}</span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('content').innerHTML = html;
+        }
+
+        // Auto-load on page open
+        loadData();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
