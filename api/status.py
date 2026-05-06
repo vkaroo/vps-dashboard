@@ -10,17 +10,16 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 
 def verify_init_data(init_data: str) -> dict:
-    """Verify Telegram Mini App initData using HMAC-SHA256."""
+    """Verify Telegram Mini App initData per official docs."""
     if not BOT_TOKEN:
         return {"ok": False, "error": "BOT_TOKEN not configured"}
 
-    # Parse to get hash and user
     parsed = urllib.parse.parse_qs(init_data, keep_blank_values=True)
     received_hash = parsed.get("hash", [None])[0]
     if not received_hash:
-        return {"ok": False, "error": "Missing hash", "keys": list(parsed.keys())}
+        return {"ok": False, "error": "Missing hash"}
 
-    # Build data-check-string: sorted key=value pairs (decoded), excluding hash
+    # Build data-check-string: all fields except hash, sorted alphabetically
     data_check_pairs = []
     for k in sorted(parsed.keys()):
         if k == "hash":
@@ -28,32 +27,14 @@ def verify_init_data(init_data: str) -> dict:
         data_check_pairs.append(f"{k}={parsed[k][0]}")
     data_check_string = "\n".join(data_check_pairs)
 
-    # HMAC-SHA256 with secret = SHA256(bot_token)
-    secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
+    # secret_key = HMAC_SHA256(<bot_token>, "WebAppData")
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+
+    # hash = hex(HMAC_SHA256(data_check_string, secret_key))
     computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(computed_hash, received_hash):
-        # Also try with raw (encoded) values
-        raw_pairs = []
-        for part in init_data.split("&"):
-            if part.startswith("hash="):
-                continue
-            raw_pairs.append(part)
-        raw_pairs.sort()
-        raw_check_string = "\n".join(raw_pairs)
-        raw_hash = hmac.new(secret_key, raw_check_string.encode(), hashlib.sha256).hexdigest()
-
-        return {
-            "ok": False,
-            "error": "Hash mismatch",
-            "decoded_computed": computed_hash[:16],
-            "raw_computed": raw_hash[:16],
-            "received": received_hash[:16],
-            "pairs_count": len(data_check_pairs),
-            "token_len": len(BOT_TOKEN),
-            "token_prefix": BOT_TOKEN[:8] if len(BOT_TOKEN) > 8 else "SHORT",
-            "dcs_first_100": data_check_string[:100],
-        }
+        return {"ok": False, "error": "Hash mismatch", "computed": computed_hash[:16], "received": received_hash[:16]}
 
     user_data = {}
     if "user" in parsed:
@@ -83,13 +64,7 @@ class handler(BaseHTTPRequestHandler):
 
         result = verify_init_data(init_data)
         if not result["ok"]:
-            self._send_json(
-                401,
-                {
-                    "error": result["error"],
-                    "debug": {k: v for k, v in result.items() if k != "ok"},
-                },
-            )
+            self._send_json(401, {"error": result.get("error", "Unauthorized")})
             return
 
         try:
