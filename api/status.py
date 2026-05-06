@@ -16,7 +16,7 @@ def verify_init_data(init_data: str) -> dict:
     parsed = urllib.parse.parse_qs(init_data)
     received_hash = parsed.get("hash", [None])[0]
     if not received_hash:
-        return {"ok": False, "error": "Missing hash"}
+        return {"ok": False, "error": "Missing hash", "keys": list(parsed.keys())}
 
     # Build data-check-string
     data_check_pairs = []
@@ -30,7 +30,7 @@ def verify_init_data(init_data: str) -> dict:
     computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(computed_hash, received_hash):
-        return {"ok": False, "error": "Invalid hash"}
+        return {"ok": False, "error": "Hash mismatch", "computed": computed_hash[:16], "received": received_hash[:16]}
 
     # Extract user info
     user_data = {}
@@ -45,16 +45,16 @@ def verify_init_data(init_data: str) -> dict:
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Headers', 'X-Telegram-Init-Data')
-        self.end_headers()
 
         # Get initData from header
         init_data = self.headers.get('X-Telegram-Init-Data', '')
 
         if not init_data:
+            self.send_response(401)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
             self.wfile.write(json.dumps({"error": "Missing Telegram auth"}).encode())
             return
 
@@ -63,13 +63,15 @@ class handler(BaseHTTPRequestHandler):
         if not result["ok"]:
             self.send_response(401)
             self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({"error": result["error"]}).encode())
+            self.wfile.write(json.dumps({"error": result["error"], "debug": {k: v for k, v in result.items() if k != "ok"}}).encode())
             return
 
         # Proxy to VPS API
         try:
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
             conn = http.client.HTTPConnection('129.226.213.48', timeout=5)
             conn.request('GET', '/api/status')
             res = conn.getresponse()
