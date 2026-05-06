@@ -57,9 +57,7 @@
             background: #252540; border-radius: 4px;
             margin-top: 6px; overflow: hidden;
         }
-        .progress-fill {
-            height: 100%; border-radius: 4px; transition: width 0.5s;
-        }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
         .progress-fill.green { background: linear-gradient(90deg, #00ff88, #00cc6a); }
         .progress-fill.yellow { background: linear-gradient(90deg, #ffaa00, #ff8800); }
         .progress-fill.red { background: linear-gradient(90deg, #ff4444, #cc0000); }
@@ -93,6 +91,16 @@
         }
         .auth-error h2 { color: #ff4444; margin-bottom: 12px; }
         .auth-error p { color: #888; font-size: 14px; }
+        .quick-cmd {
+            padding: 6px 12px;
+            background: #252540;
+            color: #aaa;
+            border: 1px solid #333;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .quick-cmd:active { background: #00d4ff; color: #0f0f23; }
     </style>
 </head>
 <body>
@@ -249,7 +257,69 @@
                 </div>
             `;
 
+            // Terminal
+            html += `
+                <div class="card">
+                    <div class="card-title"><span>💻</span> Terminal</div>
+                    <div id="termOutput" style="background:#0a0a1a;border-radius:8px;padding:12px;font-family:monospace;font-size:12px;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#00ff88;min-height:60px;">Welcome to VPS Terminal</div>
+                    <div style="display:flex;gap:8px;margin-top:10px;">
+                        <input type="text" id="termInput" placeholder="Enter command..." style="flex:1;padding:10px;background:#0a0a1a;border:1px solid #252540;border-radius:8px;color:#e0e0e0;font-family:monospace;font-size:13px;outline:none;">
+                        <button onclick="execCmd()" style="padding:10px 16px;background:#00d4ff;color:#0f0f23;border:none;border-radius:8px;font-weight:600;cursor:pointer;">▶</button>
+                    </div>
+                    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                        <button onclick="quickCmd('pm2 list')" class="quick-cmd">pm2 list</button>
+                        <button onclick="quickCmd('pm2 logs --lines 20')" class="quick-cmd">pm2 logs</button>
+                        <button onclick="quickCmd('free -h')" class="quick-cmd">free</button>
+                        <button onclick="quickCmd('df -h')" class="quick-cmd">disk</button>
+                        <button onclick="quickCmd('top -bn1 | head -20')" class="quick-cmd">top</button>
+                        <button onclick="quickCmd('docker ps')" class="quick-cmd">docker</button>
+                    </div>
+                </div>
+            `;
+
             document.getElementById('content').innerHTML = html;
+
+            // Re-bind Enter key for terminal input
+            document.getElementById('termInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') execCmd();
+            });
+        }
+
+        async function execCmd() {
+            const input = document.getElementById('termInput');
+            const output = document.getElementById('termOutput');
+            const cmd = input.value.trim();
+            if (!cmd) return;
+
+            output.textContent += `\n$ ${cmd}\n⏳ Running...`;
+            output.scrollTop = output.scrollHeight;
+            input.value = '';
+
+            try {
+                const resp = await fetch(`/api/exec?cmd=${encodeURIComponent(cmd)}`, {
+                    headers: { 'X-Telegram-Init-Data': initData }
+                });
+                const data = await resp.json();
+
+                // Remove "Running..."
+                let text = output.textContent;
+                text = text.replace('⏳ Running...', '');
+
+                if (data.error) {
+                    output.textContent = text + `❌ ${data.error}\n`;
+                } else {
+                    output.textContent = text + (data.output || '(no output)') + '\n';
+                }
+                output.scrollTop = output.scrollHeight;
+            } catch (e) {
+                let text = output.textContent.replace('⏳ Running...', '');
+                output.textContent = text + `❌ Request failed\n`;
+            }
+        }
+
+        function quickCmd(cmd) {
+            document.getElementById('termInput').value = cmd;
+            execCmd();
         }
 
         // Auto-load
