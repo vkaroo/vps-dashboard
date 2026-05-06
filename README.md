@@ -1,25 +1,77 @@
-# VPS Dashboard
+# VPS Monitor Dashboard
 
-Real-time VPS monitoring dashboard built with Vercel Serverless Functions.
+A real-time VPS monitoring dashboard built as a [Telegram Mini App](https://core.telegram.org/bots/webapps). Displays system resources, PM2 processes, and network stats with Telegram auto-login authentication.
 
 ## Features
 
-- 📊 Real-time CPU, RAM, Disk monitoring
-- 🤖 PM2 process status
-- 🌐 Network information
-- 📱 Mobile-friendly design
-- 🔄 Auto-refresh every 30 seconds
+- 📊 **Real-time CPU, RAM, Disk monitoring** — progress bars with color-coded thresholds
+- 🤖 **PM2 process status** — name, PID, uptime, and memory per process
+- 🌐 **Network stats** — public IP and active connections
+- 🔄 **Auto-refresh every 30 seconds** — with manual refresh button
+- 🔒 **Telegram Mini App authentication** — HMAC-SHA256 verification of `initData`
+- 📱 **Mobile-friendly dark theme UI** — responsive layout, Telegram theme integration
+- 🌍 **CORS-enabled API** — works cross-origin from Telegram WebView
 
-## API
+## Project Structure
 
-- `GET /api/status` - Returns VPS status JSON
+```
+vps-dashboard/
+├── index.html          # Frontend dashboard (Telegram Mini App)
+├── api/
+│   └── status.py       # Vercel serverless function (Telegram auth + VPS proxy)
+├── vercel.json         # Vercel deployment config
+└── README.md           # This file
+```
 
-## Deployment
+## Architecture
 
-1. Connect this repo to Vercel
-2. Deploy automatically
+```
+┌──────────────┐     initData (HMAC)      ┌──────────────────┐     HTTP      ┌─────────────┐
+│   Telegram   │ ──────────────────────▶  │  Vercel Serverless│ ──────────▶  │  VPS :80    │
+│   Mini App   │ ◀────────────────────── │  (api/status.py)  │ ◀──────────  │  /api/status│
+│  (index.html)│     JSON (system stats)  │  Verify + Proxy   │     JSON     │  (HTTP srv) │
+└──────────────┘                          └──────────────────┘              └─────────────┘
+```
 
-## Environment
+- **Frontend** — Static HTML/CSS/JS served by Vercel. Calls `/api/status` with the Telegram `initData` header.
+- **Backend** — Python serverless function on Vercel that verifies the Telegram HMAC signature, then proxies the request to the VPS.
+- **VPS** — Python HTTP server on port 80 that returns system stats (`cpu`, `ram`, `disk`, `uptime`, `processes`, `ip`, `connections`).
 
-- VPS IP: 129.226.213.48
-- API Port: 80
+## Setup
+
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/vkaroo/vps-dashboard.git
+   cd vps-dashboard
+   ```
+
+2. **Set environment variable** in Vercel dashboard
+   ```
+   TELEGRAM_BOT_TOKEN = your_bot_token_here
+   ```
+
+3. **Deploy to Vercel**
+   ```bash
+   vercel deploy --prod
+   ```
+
+4. **Configure your Telegram Bot** — set the Mini App URL to your Vercel deployment.
+
+5. **Open from Telegram** — launch the Mini App from your bot's menu button.
+
+## Tech Stack
+
+- **Python 3** — Vercel Serverless Functions (HMAC-SHA256 auth, HTTP proxy)
+- **HTML / CSS / JavaScript** — zero-dependency frontend
+- **Telegram Mini Apps API** — `telegram-web-app.js` SDK
+- **Vercel** — hosting, serverless compute, and routing
+
+## Credits
+
+- Built by [vkaroo](https://github.com/vkaroo)
+- [Telegram Mini Apps](https://core.telegram.org/bots/webapps)
+- [Vercel Serverless Functions](https://vercel.com/docs/functions)
+
+## License
+
+MIT
