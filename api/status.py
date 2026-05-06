@@ -14,36 +14,47 @@ def verify_init_data(init_data: str) -> dict:
     if not BOT_TOKEN:
         return {"ok": False, "error": "BOT_TOKEN not configured"}
 
-    # Parse WITHOUT decoding — keep raw %7B%22... values
+    # Parse to get hash and user
     parsed = urllib.parse.parse_qs(init_data, keep_blank_values=True)
     received_hash = parsed.get("hash", [None])[0]
     if not received_hash:
         return {"ok": False, "error": "Missing hash", "keys": list(parsed.keys())}
 
-    # Build data-check-string using RAW (encoded) values from the original string
-    # Telegram computes hash on the raw query string values, not decoded
-    raw_pairs = []
-    for part in init_data.split("&"):
-        if part.startswith("hash="):
+    # Build data-check-string: sorted key=value pairs (decoded), excluding hash
+    data_check_pairs = []
+    for k in sorted(parsed.keys()):
+        if k == "hash":
             continue
-        raw_pairs.append(part)  # keep as-is: "user=%7B%22id%22..."
-    raw_pairs.sort()
-    data_check_string = "\n".join(raw_pairs)
+        data_check_pairs.append(f"{k}={parsed[k][0]}")
+    data_check_string = "\n".join(data_check_pairs)
 
     # HMAC-SHA256 with secret = SHA256(bot_token)
     secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
     computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(computed_hash, received_hash):
+        # Also try with raw (encoded) values
+        raw_pairs = []
+        for part in init_data.split("&"):
+            if part.startswith("hash="):
+                continue
+            raw_pairs.append(part)
+        raw_pairs.sort()
+        raw_check_string = "\n".join(raw_pairs)
+        raw_hash = hmac.new(secret_key, raw_check_string.encode(), hashlib.sha256).hexdigest()
+
         return {
             "ok": False,
             "error": "Hash mismatch",
-            "computed": computed_hash[:16],
+            "decoded_computed": computed_hash[:16],
+            "raw_computed": raw_hash[:16],
             "received": received_hash[:16],
-            "pairs_count": len(raw_pairs),
+            "pairs_count": len(data_check_pairs),
+            "token_len": len(BOT_TOKEN),
+            "token_prefix": BOT_TOKEN[:8] if len(BOT_TOKEN) > 8 else "SHORT",
+            "dcs_first_100": data_check_string[:100],
         }
 
-    # Extract user info
     user_data = {}
     if "user" in parsed:
         try:
