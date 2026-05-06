@@ -2,12 +2,10 @@
   "version": 2,
   "builds": [
     { "src": "api/status.py", "use": "@vercel/python" },
-    { "src": "api/exec.py", "use": "@vercel/python" },
     { "src": "index.html", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/status", "dest": "/api/status.py" },
-    { "src": "/api/exec", "dest": "/api/exec.py" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

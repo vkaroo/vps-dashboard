@@ -91,16 +91,6 @@
         }
         .auth-error h2 { color: #ff4444; margin-bottom: 12px; }
         .auth-error p { color: #888; font-size: 14px; }
-        .quick-cmd {
-            padding: 8px 14px;
-            background: #252540;
-            color: #aaa;
-            border: 1px solid #333;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-        }
-        .quick-cmd:active { background: #00d4ff; color: #0f0f23; }
     </style>
 </head>
 <body>
@@ -116,32 +106,8 @@
             <div class="loading">⏳ Loading...</div>
         </div>
 
-        <button onclick="openTerminal()" style="width:100%;padding:14px;background:linear-gradient(135deg,#00d4ff,#0088cc);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;">🖥️ Open Terminal</button>
         <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
         <div class="last-update" id="lastUpdate"></div>
-    </div>
-
-    <!-- Terminal View (hidden by default) -->
-    <div id="terminalView" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a1a;z-index:100;padding:12px;flex-direction:column;">
-        <div style="display:flex;align-items:center;padding:8px 0;margin-bottom:8px;">
-            <button onclick="closeTerminal()" style="background:none;border:none;color:#00d4ff;font-size:20px;cursor:pointer;padding:4px 8px;">←</button>
-            <span style="color:#00d4ff;font-weight:600;font-size:16px;">💻 Terminal</span>
-        </div>
-        <div id="termOutput" style="flex:1;background:#0a0a1a;border:1px solid #252540;border-radius:8px;padding:12px;font-family:monospace;font-size:13px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#00ff88;">Welcome to VPS Terminal
-</div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-            <input type="text" id="termInput" placeholder="Enter command..." style="flex:1;padding:12px;background:#111;border:1px solid #252540;border-radius:8px;color:#e0e0e0;font-family:monospace;font-size:14px;outline:none;">
-            <button onclick="execCmd()" style="padding:12px 20px;background:#00d4ff;color:#0f0f23;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">▶</button>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-            <button onclick="quickCmd('pm2 list')" class="quick-cmd">pm2 list</button>
-            <button onclick="quickCmd('pm2 logs --lines 30')" class="quick-cmd">pm2 logs</button>
-            <button onclick="quickCmd('free -h')" class="quick-cmd">free</button>
-            <button onclick="quickCmd('df -h')" class="quick-cmd">disk</button>
-            <button onclick="quickCmd('top -bn1 | head -20')" class="quick-cmd">top</button>
-            <button onclick="quickCmd('docker ps')" class="quick-cmd">docker</button>
-            <button onclick="quickCmd('systemctl status nginx')" class="quick-cmd">nginx</button>
-        </div>
     </div>
 
     <script>
@@ -282,61 +248,7 @@
                 </div>
             `;
 
-            // Open Terminal button
-            html += `
-                <button onclick="openTerminal()" style="width:100%;padding:14px;background:linear-gradient(135deg,#00d4ff,#0088cc);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;">🖥️ Open Terminal</button>
-            `;
-
             document.getElementById('content').innerHTML = html;
-        }
-
-        async function execCmd() {
-            const input = document.getElementById('termInput');
-            const output = document.getElementById('termOutput');
-            const cmd = input.value.trim();
-            if (!cmd) return;
-
-            output.textContent += `\n$ ${cmd}\n⏳ Running...`;
-            output.scrollTop = output.scrollHeight;
-            input.value = '';
-
-            try {
-                const resp = await fetch(`/api/exec?cmd=${encodeURIComponent(cmd)}`, {
-                    headers: { 'X-Telegram-Init-Data': initData }
-                });
-                const data = await resp.json();
-
-                // Remove "Running..."
-                let text = output.textContent;
-                text = text.replace('⏳ Running...', '');
-
-                if (data.error) {
-                    output.textContent = text + `❌ ${data.error}\n`;
-                } else {
-                    output.textContent = text + (data.output || '(no output)') + '\n';
-                }
-                output.scrollTop = output.scrollHeight;
-            } catch (e) {
-                let text = output.textContent.replace('⏳ Running...', '');
-                output.textContent = text + `❌ Request failed\n`;
-            }
-        }
-
-        function quickCmd(cmd) {
-            document.getElementById('termInput').value = cmd;
-            execCmd();
-        }
-
-        function openTerminal() {
-            document.getElementById('dashboardView').style.display = 'none';
-            const tv = document.getElementById('terminalView');
-            tv.style.display = 'flex';
-            document.getElementById('termInput').focus();
-        }
-
-        function closeTerminal() {
-            document.getElementById('terminalView').style.display = 'none';
-            document.getElementById('dashboardView').style.display = 'block';
         }
 
         // Auto-load
@@ -344,10 +256,6 @@
         // Auto-refresh every 30s
         setInterval(loadData, 30000);
 
-        // Set up Enter key for terminal input
-        document.getElementById('termInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') execCmd();
-        });
     </script>
 </body>
 </html>
