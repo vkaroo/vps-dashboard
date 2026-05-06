@@ -73,7 +73,7 @@
         .process-status.offline { background: #ff4444; box-shadow: 0 0 6px #ff4444; }
         .process-info { flex: 1; }
         .process-name { font-weight: 600; font-size: 14px; }
-        .process-meta { color: #666; font-size: 11px; margin-top: 2px; }
+        .process-meta { color: #666; font-size: 12px; margin-top: 2px; }
         .process-mem { color: #00d4ff; font-size: 13px; font-weight: 600; }
         .refresh-btn {
             width: 100%; padding: 14px;
@@ -84,7 +84,7 @@
         }
         .refresh-btn:active { transform: scale(0.98); }
         .loading { text-align: center; padding: 40px; color: #666; }
-        .last-update { text-align: center; color: #444; font-size: 11px; margin-top: 16px; }
+        .last-update { text-align: center; color: #444; font-size: 12px; margin-top: 16px; }
         .error { color: #ff4444; text-align: center; padding: 20px; }
         .auth-error {
             text-align: center; padding: 60px 20px;
@@ -92,19 +92,20 @@
         .auth-error h2 { color: #ff4444; margin-bottom: 12px; }
         .auth-error p { color: #888; font-size: 14px; }
         .quick-cmd {
-            padding: 6px 12px;
+            padding: 8px 14px;
             background: #252540;
             color: #aaa;
             border: 1px solid #333;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 12px;
             cursor: pointer;
         }
         .quick-cmd:active { background: #00d4ff; color: #0f0f23; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Dashboard View -->
+    <div id="dashboardView" class="container">
         <div class="header">
             <h1>🖥️ VPS Monitor</h1>
             <div class="subtitle">Real-time server status</div>
@@ -115,8 +116,32 @@
             <div class="loading">⏳ Loading...</div>
         </div>
 
+        <button onclick="openTerminal()" style="width:100%;padding:14px;background:linear-gradient(135deg,#00d4ff,#0088cc);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;">🖥️ Open Terminal</button>
         <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
         <div class="last-update" id="lastUpdate"></div>
+    </div>
+
+    <!-- Terminal View (hidden by default) -->
+    <div id="terminalView" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a1a;z-index:100;padding:12px;flex-direction:column;">
+        <div style="display:flex;align-items:center;padding:8px 0;margin-bottom:8px;">
+            <button onclick="closeTerminal()" style="background:none;border:none;color:#00d4ff;font-size:20px;cursor:pointer;padding:4px 8px;">←</button>
+            <span style="color:#00d4ff;font-weight:600;font-size:16px;">💻 Terminal</span>
+        </div>
+        <div id="termOutput" style="flex:1;background:#0a0a1a;border:1px solid #252540;border-radius:8px;padding:12px;font-family:monospace;font-size:13px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#00ff88;">Welcome to VPS Terminal
+</div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+            <input type="text" id="termInput" placeholder="Enter command..." style="flex:1;padding:12px;background:#111;border:1px solid #252540;border-radius:8px;color:#e0e0e0;font-family:monospace;font-size:14px;outline:none;">
+            <button onclick="execCmd()" style="padding:12px 20px;background:#00d4ff;color:#0f0f23;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">▶</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <button onclick="quickCmd('pm2 list')" class="quick-cmd">pm2 list</button>
+            <button onclick="quickCmd('pm2 logs --lines 30')" class="quick-cmd">pm2 logs</button>
+            <button onclick="quickCmd('free -h')" class="quick-cmd">free</button>
+            <button onclick="quickCmd('df -h')" class="quick-cmd">disk</button>
+            <button onclick="quickCmd('top -bn1 | head -20')" class="quick-cmd">top</button>
+            <button onclick="quickCmd('docker ps')" class="quick-cmd">docker</button>
+            <button onclick="quickCmd('systemctl status nginx')" class="quick-cmd">nginx</button>
+        </div>
     </div>
 
     <script>
@@ -257,32 +282,12 @@
                 </div>
             `;
 
-            // Terminal
+            // Open Terminal button
             html += `
-                <div class="card">
-                    <div class="card-title"><span>💻</span> Terminal</div>
-                    <div id="termOutput" style="background:#0a0a1a;border-radius:8px;padding:12px;font-family:monospace;font-size:12px;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#00ff88;min-height:60px;">Welcome to VPS Terminal</div>
-                    <div style="display:flex;gap:8px;margin-top:10px;">
-                        <input type="text" id="termInput" placeholder="Enter command..." style="flex:1;padding:10px;background:#0a0a1a;border:1px solid #252540;border-radius:8px;color:#e0e0e0;font-family:monospace;font-size:13px;outline:none;">
-                        <button onclick="execCmd()" style="padding:10px 16px;background:#00d4ff;color:#0f0f23;border:none;border-radius:8px;font-weight:600;cursor:pointer;">▶</button>
-                    </div>
-                    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-                        <button onclick="quickCmd('pm2 list')" class="quick-cmd">pm2 list</button>
-                        <button onclick="quickCmd('pm2 logs --lines 20')" class="quick-cmd">pm2 logs</button>
-                        <button onclick="quickCmd('free -h')" class="quick-cmd">free</button>
-                        <button onclick="quickCmd('df -h')" class="quick-cmd">disk</button>
-                        <button onclick="quickCmd('top -bn1 | head -20')" class="quick-cmd">top</button>
-                        <button onclick="quickCmd('docker ps')" class="quick-cmd">docker</button>
-                    </div>
-                </div>
+                <button onclick="openTerminal()" style="width:100%;padding:14px;background:linear-gradient(135deg,#00d4ff,#0088cc);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;">🖥️ Open Terminal</button>
             `;
 
             document.getElementById('content').innerHTML = html;
-
-            // Re-bind Enter key for terminal input
-            document.getElementById('termInput').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') execCmd();
-            });
         }
 
         async function execCmd() {
@@ -322,10 +327,27 @@
             execCmd();
         }
 
+        function openTerminal() {
+            document.getElementById('dashboardView').style.display = 'none';
+            const tv = document.getElementById('terminalView');
+            tv.style.display = 'flex';
+            document.getElementById('termInput').focus();
+        }
+
+        function closeTerminal() {
+            document.getElementById('terminalView').style.display = 'none';
+            document.getElementById('dashboardView').style.display = 'block';
+        }
+
         // Auto-load
         loadData();
         // Auto-refresh every 30s
         setInterval(loadData, 30000);
+
+        // Set up Enter key for terminal input
+        document.getElementById('termInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') execCmd();
+        });
     </script>
 </body>
 </html>
